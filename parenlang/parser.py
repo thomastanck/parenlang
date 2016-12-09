@@ -142,10 +142,7 @@ class Parser:
 	def print_line_error(self, start, end=None, note=''):
 		startline, startcol = start
 		# Print the actual line
-		if startline-1 < len(self.lines):
-			print(self.lines[startline-1])
-		else:
-			print(self.get_current_line())
+		print(self.get_line(startline))
 		# Print the arrow
 		if end == None:
 			# Arrow has no extension
@@ -169,3 +166,11 @@ class Parser:
 			else:
 				# Arrow has no extension
 				print(' '*(startcol-1) + '^' + note)
+
+	def get_line(self, line):
+		if line-1 < len(self.lines):
+			return self.lines[line-1]
+		elif line-1 == len(self.lines):
+			return self.get_current_line()
+		else:
+			raise RuntimeError("Tried to get line that hasn't been parsed")
