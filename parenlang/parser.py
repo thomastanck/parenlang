@@ -1,5 +1,60 @@
 import re
 
+from .util import auto_assign # Assigns its arguments to instance attributes
+
+class Paren:
+	"""
+	A paren expression.
+
+	Examples of parens:
+	(): Paren([]) # The empty paren
+	(()): Paren([Paren([])]) # A paren containing one element, the empty paren
+	(()()): Paren([Paren([]), Paren([])]) # A paren containing two elements, each being the empty paren
+
+	(I think you get the (point)): Paren([Paren([])]) # Yeah ok I'll stop now
+
+	In addition to storing the tree structure of parens, there are additional
+	data completely ignored by the VM but we store to allow nice parsing error
+	messages and defining structure using annotations which could allow compile
+	time warnings.
+
+	file is a string containing the filename this paren is in.
+	start is a line,col tuple containing the position of the opening paren.
+	end is a line,col tuple containing the position of the closing paren.
+	start_annotation is the string preceding the opening paren.
+	end_annotation is the string preceding the closing paren.
+
+	'annotate()': Paren([], start_annotation='annotate')
+	'annotate(()strange())': Paren([Paren([]), Paren([], start_annotation='strange')], start_annotation='annotate')
+	'(end annotations)': Paren([], end_annotation='end annotations')
+	"""
+	@auto_assign
+	def __init__(self, filename='', start=None, end=None, start_annotation='', end_annotation='', children=None, parent=None):
+		if children == None:
+			self.children = []
+
+	def add_child(self, paren):
+		self.children.append(paren)
+
+	def start_paren(self, line, col, start_annotation, parent):
+		self.start = (line, col)
+		self.start_annotation = start_annotation
+		self.parent = parent
+
+	def end_paren(self, line, col, end_annotation):
+		self.end = (line, col)
+		self.end_annotation = end_annotation
+
+	def __str__(self):
+		return '(' + ''.join(map(str, self.children)) + ')'
+
+	def __repr__(self):
+		return	(	'Paren(filename={}, start={}, end={}, '
+		      	 	'start_annotation={}, end_annotation={}, children={})'.format(
+		      	 	repr(self.filename), repr(self.start), repr(self.end),
+		      	 	repr(self.start_annotation), repr(self.end_annotation),
+		      	 	repr(self.children)))
+
 class Parser:
 	"""
 	In comes string
@@ -8,57 +63,58 @@ class Parser:
 	def __init__(self, instr, filename='<nil>'):
 		self.filename = filename
 		self.instr = instr # input string
-		self.remaining = instr # String that's not yet parsed
+		self.reset_parse_state()
+
+	def reset_parse_state(self):
+		self.remaining = self.instr # String that's not yet parsed
 		self.lines = [] # List of lines that have been parsed
 		self.curlinepos = 0 # The position of the current line
 		self.line = 1 # Current line number
 		self.col = 1 # Current column number
-		self.out = [] # Output paren
-		self.parenpos = [] # List of positions of top level parens
-		self.parenstack = [] # Stack of open paretheses to be closed
+		self.out = [] # Output parens
 
 	def parse(self):
 		"""
 		Parses into a list of lists of lists...
 		"""
+		self.reset_parse_state()
 		while len(self.remaining) > 0:
-			self.peek() # Just advance the position so we can get the line/col
-			line, col = self.line, self.col
 			parsed = self.parse_paren()
 			if parsed != None:
 				self.out.append(parsed)
-				self.parenpos.append((line, col))
 		return self.out
 
-	def parse_paren(self):
+	def parse_paren(self, parentparen=None):
 		"""
 		Recursive part of the parser.
 		Returns the processed paren (list of lists of lists...).
 		"""
-		out = []
+		paren = Paren(self.filename)
 
-		tok = self.peek()
+		start_annotation, tok = self.eat()
 		if tok == None:
 			return None
 
-		if tok != '(':
+		if tok != '(': # assert(tok == '(')
 			self.unexpected_closing_error()
 
-		self.parenstack.append((self.line, self.col))
-		self.eat()
+		paren.start_paren(self.line, self.col-1, start_annotation, parentparen)
 
 		while len(self.remaining) > 0:
-			tok = self.peek()
+			annotation, tok = self.peek()
 			if tok == '(':
-				parsed = self.parse_paren()
-				out.append(parsed)
+				parsed = self.parse_paren(paren)
+				paren.add_child(parsed)
 			elif tok == ')':
-				self.eat()
-				self.parenstack.pop()
-				return out
+				self.eat() # Advance the position
+				paren.end_paren(self.line, self.col-1, annotation)
+				# TOOD: Run linter here! (to check if start and end annotations
+				# match for example)
+				return paren
 			else:
 				break
-		self.unexpected_eof_error()
+		self.eat() # just to advance it to the actual EOF
+		self.unexpected_eof_error(paren)
 
 	def eat(self):
 		"""
@@ -66,31 +122,31 @@ class Parser:
 		Also removes the token from the remaining string so the next token can
 		be parsed.
 		"""
-		tok = self.peek()
-		self.remaining = self.remaining[1:]
-		self.col += 1
-		return tok
+		annotation, tok = self.peek()
+		# Change line and col numbers, consume remaining
+		for c in annotation:
+			if c == '\n':
+				self.line += 1
+				self.lines.append(self.instr[self.curlinepos : self.curlinepos+self.col-1])
+				self.curlinepos += self.col
+				self.col = 1
+				continue
+			self.col += 1
+		self.remaining = self.remaining[len(annotation)+1:]
+		self.col += 1 if tok != None else 0
+		return annotation, tok
 
 	def peek(self):
 		"""
 		Returns the next token.
 
-		Also advances the current position up to the token (so that
-		self.remaining[0] contains the token)
+		# Also advances the current position up to the token (so that
+		# self.remaining[0] contains the token)
 		"""
 		for i, c in enumerate(self.remaining):
-			if c == '\n':
-				self.line += 1
-				self.lines.append(self.instr[self.curlinepos:self.curlinepos+self.col-1])
-				self.curlinepos += self.col
-				self.col = 1
-				continue
 			if c in ['(', ')']:
-				self.remaining = self.remaining[i:]
-				return c
-			self.col += 1
-		self.remaining = ''
-		return None
+				return self.remaining[:i], c
+		return self.remaining, None
 
 	def get_current_line(self):
 		newlinepos = self.instr[self.curlinepos:].find('\n')
@@ -100,42 +156,39 @@ class Parser:
 			return self.instr[self.curlinepos:self.curlinepos+newlinepos]
 
 	def unexpected_closing_error(self):
-		# linenumber = str(len(self.lines)+1)
-		# linenumberlength = len(str(len(self.lines)+1))
-		prefix = '{}:{}:{}:'.format(self.filename, self.line, self.col)
+		prefix = '{}:{}:{}:'.format(self.filename, self.line, self.col-1)
 		print('{} error: Expected ( but got ) instead.'.format(prefix))
 		print('{}  hint: Did you forget to remove a closing paren?'.format(' '*len(prefix)))
-		self.print_line_error((self.line, self.col))
-		# print(self.get_current_line())
-		# print(' '*(self.col-1) + '^')
-		if len(self.parenpos) > 0:
+		self.print_line_error((self.line, self.col-1))
+
+		if len(self.out) > 0:
 			print('{}  note: Previous paren starts here'.format(' '*len(prefix)))
-			lastline, lastcol = self.parenpos[-1]
-			self.print_line_error((lastline, lastcol), (self.line, self.col))
-			# if lastline-1 < len(self.lines):
-			#	print(self.lines[lastline-1])
-			#	if lastline == self.line:
-			#		print(' '*(lastcol-1) + '^' + '~'*(self.col-lastcol-1))
-			#	else:
-			#		print(' '*(lastcol-1) + '^' + '~'*(len(self.lines[lastline-1])-lastcol))
-			# else:
-			#	print(self.get_current_line())
-			#	print(' '*(lastcol-1) + '^' + '~'*(self.col-lastcol-1))
+			prevparen = self.out[-1]
+			self.print_line_error(prevparen.start, (prevparen.end[0], prevparen.end[1]+1))
+
 		print()
 		raise SyntaxError('{} Unexpected closing paren'.format(prefix))
 
-	def unexpected_eof_error(self):
+	def unexpected_eof_error(self, paren):
 		prefix = '{}:{}:{}:'.format(self.filename, self.line, self.col)
 		print('{} error: Unexpected EOF'.format(prefix))
 		print('{}  hint: Did you forget to close a paren?'.format(' '*len(prefix)))
 		self.print_line_error((self.line, self.col), note=' EOF')
-		# print(self.get_current_line())
-		# print(' '*(self.col-1) + '^ EOF')
-		print('{}  note: There are {} unclosed parens'.format(' '*len(prefix), len(self.parenstack)))
-		for paren in self.parenstack:
-			prefix = '{}:{}:{}:'.format(self.filename, paren[0], paren[1])
+
+		num_unclosed = 0
+		unclosed = paren
+		while unclosed:
+			unclosed = unclosed.parent
+			num_unclosed += 1
+
+		print('{}  note: There are {} unclosed parens'.format(' '*len(prefix), num_unclosed))
+		unclosed = paren
+		while unclosed:
+			prefix = '{}:{}:{}:'.format(unclosed.filename, unclosed.start[0], unclosed.start[1])
 			print('{}  note: unclosed paren'.format(prefix))
-			self.print_line_error(paren, (self.line, self.col))
+			self.print_line_error(unclosed.start, (self.line, self.col))
+			unclosed = unclosed.parent
+
 		print()
 		raise SyntaxError('{} Unexpected EOF'.format(prefix))
 
