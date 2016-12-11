@@ -19,7 +19,7 @@ will get as a programmer, and the more efficient you will be. `paren` is
 designed with these two goals in mind, and is now the fastest, most error
 resistant, and most efficient language.
 
-This is why `paren` only uses two characters in its character set. `(` and `)`,
+This is why `paren` only uses two characters in its character set, `(` and `)`,
 as having more characters only increases the chances of a typo and easily
 creates crashing builds, which is obviously no good. All other characters raise
 an error in development as `paren` adopts a fail-fast philosophy. However, in
