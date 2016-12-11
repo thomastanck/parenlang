@@ -1,0 +1,161 @@
+for now, let's use symbols. but later we can replace these symbols with
+quoted lists.
+
+all parens are similar to cons lists.
+
+nil == an implicit atom. () can be thought of as (nil nil). for all intents and purposes you can just ignore this :P
+() == the atom func which we'll just denote as ()
+(()) == the lambda function which we'll denote as lambda
+
+the atom func is named that because it is both an atom and a function. the reason
+why i call this an atom is because nothing else is an atom.
+
+what the atom func does is either quote a paren or return the lambda function.
+the only difference is the existence of a parameter. you can think of it as accepting
+either a nil parameter or a list parameter. if the parameter is a list, it is quoted.
+else, it returns the lambda function.
+
+(quote expr) == (() expr) == the expr as a atom
+(lambda (x) e) == ((()) x e) == a function that takes x as an argument, replaces all instances of x in e with the value provided, evaluates e, and returns it.
+(lambda (x) e) arg --> (let ((x arg)) e)
+
+(lambda (a b) e) is shorthand for (lambda (a) (lambda (b) e))
+Function calls such as (f a b) are also shorthand for ((f a) b)
+In core paren, lambdas only accept a single argument, as this simplifies currying logic
+
+
+Boolean stuff
+
+true := (lambda (a b) a)
+false := (lambda (a b) b)
+if := (lambda (c a b) (c a b))
+and := (lambda (p q) (if p q false))
+or := (lambda (p q) (if p true q))
+not := (lambda (p) (if p false true))
+nand := (lambda (p q) (if p false (not q)))
+xor := (lambda (p q) (if p (not q) q))
+
+Data stuff
+
+cons := (lambda (a b) (lambda (f) (f a b)))
+first := (lambda (c) (c (lambda (a b) a)))
+rest := (lambda (c) (c (lambda (a b) b)))
+
+Church numerals
+
+0 := (lambda (f x) x)
+1 := (lambda (f x) (f x))
+2 := (lambda (f x) (f (f x)))
+
+succ := (lambda (n) (lambda (f x) (f (n f x))))
+(succ 0) -> (lambda (f x) (f (0 f x)))
+         -> (lambda (f x) (f x))
+         -> 1
+(succ 1) -> (lambda (f x) (f (1 f x)))
+         -> (lambda (f x) (f (f x)))
+         -> 2
+
+add := (lambda (m n) (lambda (f x) (m f (n f x))))
+(add 1 0) -> (lambda (f x) (1 f (0 f x)))
+          -> (lambda (f x) (1 f x))
+          -> (lambda (f x) (f x))
+          -> 1
+(add 1 1) -> (lambda (f x) (1 f (1 f x)))
+          -> (lambda (f x) (1 f (f x)))
+          -> (lambda (f x) (f (f x)))
+          -> 2
+(add 2 2) -> (lambda (f x) (2 f (2 f x)))
+          -> (lambda (f x) (2 f (f (f x))))
+          -> (lambda (f x) (f (f (f (f x)))))
+          -> 4
+
+mul := (lambda (m n) (lambda (f x) (m (n f) x)))
+exp := (lambda (m n) n m)
+(exp 2 3) -> (3 2)
+          -> (lambda (a) (2 (2 (2 a))))
+          -> (lambda (a) (2 (2 (lambda (b) (a (a b))) )))
+          -> (lambda (a) (2 (lambda (c) ((2 a) ((2 a) c))) ))
+          -> (lambda (a) (2 (lambda (c) (2 a (2 a c))) ))
+          -> (lambda (a) (2 (lambda (c) (2 a (a (a c)))) ))
+          -> (lambda (a) (2 (lambda (c) (a (a (a (a c))))) ))
+          -> (lambda (a) (2 (4 a)))
+          -> (lambda (a) (lambda (d) (4 a (4 a d))) )
+          -> (lambda (a) (lambda (d) (4 a (a (a (a (a d)))))) )
+          -> (lambda (a) (lambda (d) (a (a (a (a (a (a (a (a d))))))))) )
+          -> (lambda (a) (8 a))
+          -> 8
+
+pred := (lambda (n)
+			(lambda (f x)
+				(n (lambda (innerx rewrapfunc) (rewrapfunc (innerx f)))) ;; KEY LAMBDA
+					(lambda (substitutedx) x)
+					(lambda (rewrap) rewrap)
+			)
+		)
+
+zero [\f.\x.x] = \f.\x.x
+succ [\n.\f.\x.f (n f x)] = \n.\f.\x.f (n f x)
+
+one [succ zero] = \f.f
+two [succ one] = \f.\x.f (f x)
+three [succ two] = \f.\x.f (f (f x))
+four [succ three] = \f.\x.f (f (f [f x]))
+
+iszero [\n.n (\f.F) T] = \n.n (\f.F) T
+
+add [\m.m succ] = \m.m (\n.\f.\x.f (n f x))
+mul [\m.\n.\f.m (n f)] = \m.\n.\f.m (n f)
+exp [\m.\n.n m] = \m.\n.n m
+pred [\n.\f.\x.n (\g.\h.h (g f)) (\a.x) (\b.b)] = \n.\f.\x.n (\g.\h.h (g f)) (\a.x) (\b.b)
+sub [\m.\n. n pred m] = \m.\n.n (\i0.\f.\x.i0 (\g.\h.h [g f]) (\a.x) (\b.b)) m
+
+pred one
+⇒	λf.λx.(λi0.i0) (λg.λh.h (g f)) (λa.x) (λb.b)
+⇒	λf.λx.(λg.λh.h (g f)) (λa.x) (λb.b)
+⇒	λf.λx.(λh.h ([λa.x] f)) (λb.b)
+⇒	λf.λx.(λb.b) ((λa.x) f)
+⇒	λf.λx.(λa.x) f
+⇒	zero
+
+It's interesting to see how this works. Basically the very core of it
+substitutes an instance of (f x) with x itself, and then rewraps all higher f's
+with just f.
+The labeled key lambda is the function that fills the f parameter of the church
+numeral (the iterated function). It thus needs to be able to accept a single
+argument, which in church numerals is a number (either x or a lambda that accepts f and x).
+This argumunt is innerx. it takes innerx and partially applies it with f, resulting in a function that accepts only an x.
+it then returns that function.... actually have no idea how it works. let's just try it on a few numbers
+
+keep in mind that there is a global f here, coming from the outer lambda encasing all this.
+2 = (f (f x))
+(0 (lambda (g h) (h (g f)))) = x
+(1 (lambda (g h) (h (g f)))) = ((lambda (g h) (h (g f))) x)
+                             = (lambda (h) (h (x f)))
+(2 (lambda (g h) (h (g f)))) = ((lambda (g h) (h (g f))) ((lambda (g h) (h (g f))) x))
+                             = ((lambda (g h) (h (g f))) (lambda (h) (h (x f))) )
+                             = (lambda (h) (h (f (x f))))
+(3 (lambda (g h) (h (g f)))) = ((lambda (g1 h1) (h1 (g1 f))) ((lambda (g2 h2) (h2 (g2 f))) ((lambda (g3 h3) (h3 (g3 f))) x)))
+                             = ((lambda (g1 h1) (h1 (g1 f))) ((lambda (g2 h2) (h2 (g2 f))) (lambda (h3) (h3 (x f)))))
+                             = ((lambda (g1 h1) (h1 (g1 f))) (lambda (h2) (h2 (f (x f)))) )
+                             = (lambda (h) (h (f (f (x f)))))
+It seems to transform the innermost x into (x f), the first f with h, and keeps the remaining f's intact. Note that we're actually applying x to the function. the actual resulting functions are
+(0 (lambda (g h) (h (g f)))) = (lambda (x) x)
+(1 (lambda (g h) (h (g f)))) = (lambda (x) (lambda (h) (h (x f))))
+(2 (lambda (g h) (h (g f)))) = (lambda (x) (lambda (h) (h (f (x f)))))
+(3 (lambda (g h) (h (g f)))) = (lambda (x) (lambda (h) (h (f (f (x f))))))
+Now this makes more sense... Finally we have the substitutedx and the rewrap functions which we pass in...
+innerpred 0 = (substitutedx rewrap) = x = 0
+innerpred 1 = (rewrap (substitutedx f)) = (rewrap x) = x = 0
+innerpred 2 = (rewrap (f (substitutedx f))) = (rewrap (f x)) = (f x) = 1
+innerpred 3 = (rewrap (f (f (substitutedx f)))) = (rewrap (f (f x))) = (f (f x)) = 2
+(pred 1) -> (lambda (f x)
+				( (1 (lambda (g h) (h (g f))) )
+					(lambda (u) x)
+					(lambda (w) w) ) )
+		 -> (lambda (f x)
+				( (lambda (g h) (h (g f)))
+					(lambda (u) x)
+					(lambda (w) w) ) )
+		 -> (lambda (f x)
+				x )
+		 -> 0

@@ -1,0 +1,124 @@
+Introduction: The problem
+=========================
+
+parens by themselves aren't enough to describe lambda calculus, for 3 reasons.
+
+- We need to distinguish between a function call and a lambda expression.
+- Lambda calculus has an infinite set of arbitrary symbols *in addition* to parentheses.
+- We need a way to communicate with the outside world.
+
+There is a 4th problem that isn't a problem in theory, but would severely limit
+the expressibility of `paren`.
+
+- The abilitity to read parens using `paren` code.
+
+The solution
+------------
+
+These 4 things thus create a requirement for builtins, and there are 4 builtins
+designed to solve each one.
+
+1) `()` Quote builtin
+2) `(())` Lambda operator
+3) `((()))` Outside-world operator
+4) `(((())))` Paren parser
+
+Note: It appears to be possible to artificially create the 4th builtin using the
+3rd builtin, by writing a function in the outside world that parses a paren.
+However, the difference is that the argument to the 3rd builtin is evaluated
+before it is passed, whereas the argument to the 4th builtin must not be
+evaluated before it is passed. The alternative is to allow outside world
+functions to decide whether to evaluate the expression provided or not, but even
+then you have the disadvantage of a long function name just to parse a paren, a
+function which is probably relatively well used. `( ((())) (() ()) paren... )`
+is much longer than `( (((()))) paren...　)`
+
+Details
+=======
+
+Function definition and function calls
+--------------------------------------
+
+In `paren`, like lambda calculus, there are only two real operators, function
+definition and function calling. Function definitions use the `(())` lambda
+operator with `()` quoted parens to bind variables. Function calls are comprised
+of a lambda expression on the left and an argument on the right. Like in lambda
+calculus, all functions only have one argument, and function calls only accept
+one argument.
+
+However, `paren` allows you to chain function calls, i.e. a sequence of parens
+is left-associative. For example, if a, b, and c represent three different
+`paren` expressions, `(a b c)` is syntactic sugar for `((a b) c)`.
+
+`paren` as a binary tree
+------------------------
+
+Thus, at its core, `paren` programs are binary trees. There exists a current
+language that already uses code represented as a binary tree. It's name is Iota
+and can be seen [here](https://en.wikipedia.org/wiki/Iota_and_Jot). However, we
+do not use Iota because it's a much more complicated language than lambda
+calculus is, and due to its dense encoding, we are disallowed from extending
+such a language. Binary trees have to end somewhere though, their leaves. In
+`paren`, there is only one type of leaf, that is `()`. Try writing a nested tree
+of parens and you'll see how this is true.
+
+Single-branch tree nodes
+------------------------
+
+You'll note however, that you can in fact nest parens without having two
+children! The obvious example being `(())`, which is a paren that only contains
+one child, the `()`. While in `paren`'s python internals this doesn't matter as
+parens simply contain a possibly-empty array of its children, it doesn't fit
+into our model of `paren` expressions being binary trees, which is useful to
+reason with and think about.
+
+The main issue here lies in the type of leaf we've chosen to be atomic, that is
+`()`. To solve this, we can conjure up an imaginary atom `nil`, which represents
+the empty space between parens. The expression `()` is now no longer atomic, and
+is actually an internal node that contains two `nil` children. Similarly, the
+expression `(())` is a binary tree whose left branch is `()` and whose right
+branch is `nil`. This resolves our issue of `paren` -> binary tree mapping! As a
+bonus side effect, all internal nodes of our binary tree now correspond to a
+paren expression somewhere, and all leaves are nil, saving us the trouble of
+having to define special cases for single branch or leaf paren expressions.
+
+Evaluating `paren` code
+-----------------------
+
+So we've established that `paren` is a binary tree that calls its left branch
+with its right branch, returning the result. Finally we can go into the
+details of how this is done!
+
+For core functions in `paren`, we check if its argument is `nil`, do something if it is, and
+something else if it's not. This is the key mechanic of how builtin `paren`
+functions work. To abbreviate the code above, we'll say that
+
+    function arg = ifargisnil, ifargisnotnil
+
+The first core function in paren is the `()` function, which must be a function
+as it does not have a left branch to evaluate the result of! We can describe the
+`()` function as follows:
+
+    () arg = (()), quote(arg)
+
+If the `()` function does not receive an input, it returns the `(())` function,
+and if it does, it quotes its argument and returns that (more on quote later).
+This way, the expression `(())` corresponds to the `(())` function, which is
+nice and transparent to us, but here we can see that in our little binary-tree-
+bubble, we don't have to specially define a separate syntax for `(())`, and the
+only unique syntax is `()`.
+
+Here are all the builtin functions:
+
+    () arg = (()), quote(arg)
+    (()) arg = ((())), lambda-binder(arg)
+    lambda-binder arg = error, lambda-expression(arg)
+    ((())) arg = (((()))), outside-world(arg)
+    (((()))) arg = paren-converter(nil), paren-converter(arg)
+
+
+
+
+
+
+

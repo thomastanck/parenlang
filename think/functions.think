@@ -1,0 +1,214 @@
+Contains paren expressions for several useful functions
+
+# Church numerals
+
+zero	[\f.\x.x]
+succ	[\n.\f.\x.f (n f x)]
+
+zero(	(((lam))) arg1(() ()) ( (((lam))) arg2(() (())) result arg2(() (())) ) zero)
+succ(	(((lam))) arg1(() ()) ( (((lam))) arg2(() (())) ( (((lam))) arg3(() ((()))) result( arg2(() (())) nfx( arg1(() ()) arg2(() (())) arg3(() ((()))) nfx) result)))succ)
+
+one  	[succ zero]
+two  	[succ one]
+three	[succ two]
+four 	[succ three]
+one( 	(((lam))) arg1(() ()) ( (((lam))) arg2(() (())) result( arg1(() ()) arg2(() (())) result) ) one)
+
+iszero	[\n.n (\f.F) T]
+
+add 	[\m.m succ]
+mul 	[\m.\n.\f.m (n f)]
+exp 	[\m.\n.n m]
+pred	[\n.\f.\x.n (\g.\h.h (g f)) (\a.x) (\b.b)]
+sub 	[\m.\n. n pred m]
+
+# Booleans
+
+true 	[\a.\b.a]
+false	[\a.\b.b]
+if   	[\c.c]
+
+# Y Combinator
+selfcaller        	[\gen.gen gen]
+improved-gen-maker	[\improver.\gen.improver (gen gen)]
+y                 	[\improver.selfcaller (improved-gen-maker improver)]
+y                 	[\improver.(\gen.gen gen) (\gen.improver (gen gen))]
+y                 	[\improver.(\gen.improver (gen gen)) (\gen.improver (gen gen))]
+
+fact-improver         	[\lesser-fact.\n.if (iszero n) one (mul n (lesser-fact (pred n))]
+fact-tailcall-improver	[\lesser-fact.\cur.\n.if (iszero n) cur (lesser-fact (mul n cur) (pred n))]
+fact                  	[y fact-improver]
+fact-tailcall         	[y fact-tailcall-improver one]
+
+# Cons-Lists
+
+cons-c   	[\1.\2.\getter.getter \1 \2]
+left-c-g 	[\1.\2.\1]
+right-c-g	[\1.\2.\2]
+left-c   	[\l.l left-g]
+right-c  	[\l.l right-g]
+
+# Lists (paren style)
+
+empty    	[\getter.getter true zero zero]
+cons     	[\first.\rest.\getter.getter false first rest]
+isempty-g	[\isempty.\first.\rest.isempty]
+first-g  	[\isempty.\first.\rest.first]
+rest-g   	[\isempty.\first.\rest.rest]
+isempty  	[\l.l isempty-g]
+first    	[\l.l left-g]
+rest     	[\l.l rest-g]
+
+push	[\x.\list.cons x list]
+
+# f takes two arguments, the current item, and its previous state.
+foldimprover	[\lesserfold.\f.\prev.\list.(if (isempty list) prev (lesserfold f (f (first list) prev) (rest list)) )]
+fold        	[\f.\initial.\list.(y foldimprover f initial list)]
+
+testfold	[fold (\i.\prev.add prev i) zero (cons one (cons two empty))]
+
+reverse	[\list.fold (\i.\prev.push i prev) empty list]
+
+map	[\f.\list.reverse (fold (\i.\prev.push (f i) prev) empty list)]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+====
+
+notes on the y combinator
+-------------------------
+
+selfcaller        	[\gen.gen gen]
+improved-gen-maker	[\improver.\gen.improver (gen gen)]
+y                 	[\improver.selfcaller (improved-gen-maker improver)]
+y                 	[\improver.(\gen.gen gen) (\gen.improver (gen gen))]
+y                 	[\improver.(\gen.improver (gen gen)) (\gen.improver (gen gen))]
+
+First, we introduce a core concept that I'm going to call a `gen`.
+
+A gen is a function that accepts a function of a `similar` type, and is
+able to perform some sort of recursion on that function. Below is an example of
+a gen.
+
+(selfcaller gen) == (gen gen)
+
+The simplest gen is the selfcaller. It calls the function provided with the
+function provided. However if you just run the selfcaller with the selfcaller,
+you just get infinite selfcalling.
+
+(selfcaller selfcaller) == (selfcaller selfcaller) == ...
+
+This is where we want to create a `gen` that somehow "does something" before
+doing the selfcalling. In comes improved-gen-maker!
+
+(improved-gen-maker improver) --> improved-gen
+(improved-gen gen) == (improver (gen gen)) == (improver (selfcaller gen))
+
+The improved-gen-maker makes an improved-gen, by accepting a function that
+improves a function similar to itself. The improved-gen then accepts a gen
+function, uses the improver function by calling it on the selfcaller in its
+core.
+
+Here's an example of an improver, the factorial function.
+
+(fact-improver lesser-fact n) == if n == 0 then 1 else n * lesser-fact n-1))
+
+Here, we see that if fact-improver is given a lesser-fact which is capable of
+doing what fact-improver does, just only being able to do it up to n-1, then
+fact-improver improves on that by allowing you to call it on n. Thus fact-
+improver 'improves' lesser-fact by one step.
+
+We can see this in action, but first, we define a function that just errors so
+we can see what a function that can't do anything (is completely un-improved)
+looks like:
+
+(badfact lesser-fact n) == 0
+
+We expect fact-improver to always return 1 or greater! So if we ever get
+badfact, we end up multiplying the result by 0 and getting... 0. That way we'll
+know something went wrong. Let's try improving badfact to get a factorial
+function that works on n=0.
+
+factorial0 = (fact-improver badfact) == \n.(if n == 0 then 1 else n * (badfact n-1))
+
+Let's try running it.
+
+(factorial0 0)	== (if 0 == 0 then 1 else 0 * (badfact 0-1))
+              	== 1
+
+What if we try some other number?
+
+(factorial0 1)	== (if 1 == 0 then 1 else 1 * (badfact 1-1))
+              	== 1 * (badfact 1-1)
+              	== 1 * 0
+              	== 0
+
+Woops! We wound up calling badfact and that caused our whole expression to
+become 0. What if we improve it again?
+
+factorial1 = (fact-improver factorial0) == \n.(if n == 0 then 1 else n * (factorial0 n-1))
+
+Now we can use factorial1 on 0 and 1, but not 2.
+
+(factorial1 0) == (if 0 == 0 then 1 else 0 * (factorial0 0-1)) == 1
+(factorial1 1) == (if 1 == 0 then 1 else 1 * (factorial0 1-1)) == 1 * (factorial0 0) == 1
+(factorial1 2) == (if 2 == 0 then 1 else 2 * (factorial0 2-1)) == 2 * (factorial0 1) == 2 * 0 == 0
+
+We can simply call fact-improver on factorialn forever to keep improving it.
+Eventually we should get the actual factorial function!
+
+Now what happens if we pass improved-gen into the selfcaller?
+
+  	(selfcaller (improved-gen-maker improver))
+==	original-expression                     	# This is the original expression, using parts we know of above
+  	                                        	# This expression's purpose is to evaluate improver and return its result.
+  	                                        	# However it must also call improver on its result... (recursion)
+==	(selfcaller improved-gen)               	# Make the gen
+==	(improved-gen improved-gen)             	# Selfcall it
+==	((\gen.improver (gen gen)) improved-gen)	# Replace the first improved-gen abbreviation with its full name.
+  	                                        	# Note that improver corresponds to the function we passed into the maker
+==	(improver (selfcaller improved-gen))    	# Pass improved-gen into the improved-gen...
+==	result-of-improver                      	# Clearly, we just called improver, so this is its result.
+  	                                        	# Therefore, original-expression == result-of-improver
+==	(improver original-expression)          	#
+==	(improver result-of-improver)           	# We have just managed to pass improver a copy of its result!
+
+With all this, we can write the y combinator with only selfcaller and improved-gen-maker
+
+y	[\improver.selfcaller (improved-gen-maker improver)]
+
+Un-abbreviating improved-gen-maker we get
+
+y	[\improver.selfcaller (\gen.improver (gen gen))]
+
+Un-abbeviating selfcaller, we get
+
+y	[\improver.(\gen.gen gen) (\gen.improver (gen gen))]
+
+And this is the shortest form without any abbreviations. However, we note that
+the selfcaller does in fact do selfcalling. What happens if we try that right
+now?
+
+y	[\improver.(\gen.improver (gen gen)) (\gen.improver (gen gen))]
+
+And we get a nice "symmetrical" y combinator, whose core is a function that is
+called on an exact copy of itself (really it's nothing special, since we just
+ran selfcaller!)

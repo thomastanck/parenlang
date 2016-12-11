@@ -1,0 +1,43 @@
+Things needed for Lisp
+----------------------
+
+1) Infinite set of atomic symbols
+2) Ability to create pairs of S-expressions
+3) Rules to interpret such S-expressions
+
+Atomic symbols are S-expressions, and so are pairs of S-expressions.
+
+Example atoms:
+a
+apple
+42
+nil
+
+Example pairs:
+(atom . atom)
+(atom . (another . pair))
+((atom . atom) . (pair . pair))
+
+To manipulate S-expressions, there are these 5 core commands
+
+atom    (tells you if an S-expression is an atomic symbol or a pair)
+eq      (tells you if two atomic symbols are the same. undefined if pair)
+car     (returns the first of a pair. undefined if atom)
+cdr     (returns the second of a pair. undefined if atom)
+cons    (constructs a pair out of two S-expressions)
+
+As S-expressions can get rather unwieldy, Lisp treats such pairs as if they were a linked list.
+
+(a b c d) is thus equivalent to the S-expression (a . (b . (c . (d . nil)))) and now we see modern Lisp syntax.
+By the way, binary trees can also be implemented in a balanced way, but the representation would look lopsided.
+((a b) c d) is equivalent to ((a . b) . (c . (d . nil)))
+
+With these 5 commands, you can do a limited amount of list processing.
+In order to be able to write all possible functions, we need the following.
+
+Four additional commands for S-functions
+
+quote
+cond
+lambda
+label

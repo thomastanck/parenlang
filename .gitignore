@@ -10,4 +10,4 @@
 /*.egg-info
 
 # My scratchpads :^)
-*.think
+# *.think # Actually let's publish them.
