@@ -18,7 +18,7 @@ The solution
 These 4 things thus create a requirement for builtins, and there are 4 builtins
 designed to solve each one.
 
-1) `()` Quote builtin
+1) `()` Symbol builtin
 2) `(())` Lambda operator
 3) `((()))` Outside-world operator
 4) `(((())))` Paren parser
@@ -41,7 +41,7 @@ Function definition and function calls
 
 In `paren`, like lambda calculus, there are only two real operators, function
 definition and function calling. Function definitions use the `(())` lambda
-operator with `()` quoted parens to bind variables. Function calls are comprised
+operator with `()` symbols to bind variables. Function calls are comprised
 of a lambda expression on the left and an argument on the right. Like in lambda
 calculus, all functions only have one argument, and function calls only accept
 one argument.
@@ -99,22 +99,51 @@ The first core function in paren is the `()` function, which must be a function
 as it does not have a left branch to evaluate the result of! We can describe the
 `()` function as follows:
 
-    () arg = (()), quote(arg)
+    () arg = (()), symbol(arg)
 
 If the `()` function does not receive an input, it returns the `(())` function,
-and if it does, it quotes its argument and returns that (more on quote later).
-This way, the expression `(())` corresponds to the `(())` function, which is
-nice and transparent to us, but here we can see that in our little binary-tree-
-bubble, we don't have to specially define a separate syntax for `(())`, and the
-only unique syntax is `()`.
+and if it does, it converts its argument to a symbol and returns that (more on
+symbol later). This way, the expression `(())` corresponds to the `(())`
+function, which is nice and transparent to us, but here we can see that in our
+little binary-tree-bubble, we don't have to specially define a separate syntax
+for `(())`, and the only unique syntax is `()`.
 
 Here are all the builtin functions:
 
-    () arg = (()), quote(arg)
+    () arg = (()), symbol(arg)
     (()) arg = ((())), lambda-binder(arg)
     lambda-binder arg = error, lambda-expression(arg)
     ((())) arg = (((()))), outside-world(arg)
-    (((()))) arg = paren-converter(nil), paren-converter(arg)
+    (((()))) arg = error, paren-converter(arg)
+
+In the case where the left side does not match any one of these, you get your
+good ol function call.
+
+    symbol(arg1) arg2 = symbol(arg1), (substitute(arg1), arg2)
+    arg1 arg2 = arg1 beta-reduce(arg1, arg2)
+
+You'll note that the operator (arg1) is the one being substituted, or in other
+words it is the one being evaluated, and so `paren` uses normal-order
+evaluation. In contrast, Scheme LISP uses applicative-order evaluation, which
+means it evaluates its arguments before evaluating the function.
+
+The builtins
+------------
+
+`symbol` converts a paren into a symbol that can be used to create or refer to
+bindings. You'd use this in the first argument to a lambda expression to create
+a binding, and you can use this in the body of the lambda in order to refer to
+that argument. When beta reduction occurs, these symbols will be substituted by
+the argument to the function call.
+
+
+
+
+
+
+
+
+
 
 
 

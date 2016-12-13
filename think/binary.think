@@ -1,0 +1,38 @@
+Representing `paren` trees as a binary string
+---------------------------------------------
+
+`paren` trees are basically binary trees with the only exception being that if
+the left branch is nil, the right branch must also be nil. I think it might be
+possible to find a unique number that represents any `paren` tree by building it
+recursively.
+
+Let empty parens `()` be represented by `1`, and note that its depth is `0`. If
+the paren is not empty, then there are two cases, `(a)` and `(a b)`, and its
+depth is `max(depth(a), depth(b))+1`. In the first case, we can right-pad a's
+string with a number of zeroes equal to its depth. For example if `a` is
+represented by `10` and its depth is `1`, then `(a)` is represented by `1000`
+whose depth is `2`. In the second case, we first figure out which branch has a
+higher depth. The lower depth paren is left-padded with 0's until the two
+representations have the same length, and the higher depth paren is left
+untouched. Then the two strings are concatenated left first. For example if `a`
+is represented by `10` with depth `1`, and `b` is represented by `1000` with
+depth `2`, `a` must first be right-padded, resulting in `0010`, and the two are
+concatenated, resulting in `00101000`
+
+Enumerating short parens and their representation
+-------------------------------------------------
+
+
+Binary tree analogue	Representation	`paren` shorthand	Shortened
+()                  	1             	()               	N
+(())                	10            	(())             	N
+(()())              	11            	(()())           	N
+(()(()))            	0110          	(()(()))         	N
+(()(()()))          	0111          	(()(()()))       	N
+((()))              	1000          	((()))           	N
+((())())            	1001          	((())())         	N
+((())(()))          	1010          	((())(()))       	N
+((())(()()))        	1011          	((())(()()))     	N
+((()())())          	1101          	(()()())         	Y
+((()())(()))        	1110          	(()()(()))       	Y
+((()())(()()))      	1111          	(()()(()()))     	Y

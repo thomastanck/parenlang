@@ -28,6 +28,14 @@ true 	[\a.\b.a]
 false	[\a.\b.b]
 if   	[\c.c]
 
+and   	[\a.\b.if a b false]
+or    	[\a.\b.if a true b]
+not   	[\a.if a false true]
+nand  	[\a.\b.if a false (not b)]
+xor   	[\a.\b.if a (not b) b]
+xnor  	[\a.\b.if a b (not b)]
+andnot	[\a.\b.and a (not b)]
+
 # Y Combinator
 selfcaller        	[\gen.gen gen]
 improved-gen-maker	[\improver.\gen.improver (gen gen)]
@@ -50,7 +58,7 @@ right-c  	[\l.l right-g]
 
 # Lists (paren style)
 
-empty    	[\getter.getter true zero zero]
+empty    	[\getter.getter true true true]
 cons     	[\first.\rest.\getter.getter false first rest]
 isempty-g	[\isempty.\first.\rest.isempty]
 first-g  	[\isempty.\first.\rest.first]
@@ -61,15 +69,28 @@ rest     	[\l.l rest-g]
 
 push	[\x.\list.cons x list]
 
+# Higher order functions
+
 # f takes two arguments, the current item, and its previous state.
-foldimprover	[\lesserfold.\f.\prev.\list.(if (isempty list) prev (lesserfold f (f (first list) prev) (rest list)) )]
-fold        	[\f.\initial.\list.(y foldimprover f initial list)]
+foldlimprover	[\lesserfold.\f.\prev.\list.(if (isempty list) prev (lesserfold f (f (first list) prev) (rest list)) )]
+foldl        	[\f.\initial.\list.(y foldimprover f initial list)]
 
-testfold	[fold (\i.\prev.add prev i) zero (cons one (cons two empty))]
+foldrimprover	[\lesserfold.\f.\prev.\list.(if (isempty list) prev (f (first list) (lesserfold f prev (rest list)) ) )]
+foldr        	[\f.\initial.\list.(y foldimprover f initial list)]
 
-reverse	[\list.fold (\i.\prev.push i prev) empty list]
+testfold	[foldl (\i.\prev.add prev i) zero (cons one (cons two empty))]
 
-map	[\f.\list.reverse (fold (\i.\prev.push (f i) prev) empty list)]
+last   	[\list.foldr (\i.\prev.if (isempty prev) (cons i prev)) empty list]
+butlast	[\list.foldr (\i.\prev.if (and (isempty prev) (not (first prev))) empty (cons i prev)) (\getter.getter true false false) list]
+
+reducel	[\f.\list.foldl f (first list) (rest list)]
+reducer	[\f.\list.foldr f (last list) (butlast list)]
+
+map        	[\f.\list.foldr (\i.\prev.push (f i) prev) empty list]
+reverse-map	[\f.\list.foldl (\i.\prev.push (f i) prev) empty list]
+
+reverse	[\list.reverse-map (\i.i)]
+
 
 
 
