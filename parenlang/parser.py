@@ -45,6 +45,44 @@ class Paren:
 		self.end = (line, col)
 		self.end_annotation = end_annotation
 
+	def bintree_form(self):
+		out = Paren(self.filename, self.start, self.end, self.start_annotation, self.end_annotation, None, self.parent)
+		out.children = list(map(Paren.bintree_form, self.children))
+		if len(self.children) > 2:
+			group = Paren(out.filename, out.start, out.end, out.start_annotation, out.end_annotation, out.children[:-1], out)
+			group = group.bintree_form()
+			out.children = [group, out.children[-1]]
+		return out
+
+	def shorthand_form(self):
+		out = Paren(self.filename, self.start, self.end, self.start_annotation, self.end_annotation, None, self.parent)
+		out.children = list(map(Paren.shorthand_form, self.children))
+		if len(out.children) > 1 and len(out.children[0].children) > 1:
+			out.children = out.children[0].children + out.children[1:]
+		return out
+
+	def binary_repr(self):
+		if len(self.children) == 0:
+			return '1'
+		elif len(self.children) == 1:
+			child_repr = self.children[0].binary_repr()
+			out = child_repr + '0' * len(child_repr)
+			return out
+		elif len(self.children) == 2:
+			bintree_form = self
+		else:
+			bintree_form = self.bintree_form()
+
+		# len(bintree_form.children) == 2
+		left_repr = bintree_form.children[0].binary_repr()
+		right_repr = bintree_form.children[1].binary_repr()
+		diff = len(left_repr) - len(right_repr)
+		if diff < 0:
+			left_repr = '0'*(-diff) + left_repr
+		elif diff > 0:
+			right_repr = '0'*diff + right_repr
+		return left_repr + right_repr
+
 	def __str__(self):
 		return '(' + ''.join(map(str, self.children)) + ')'
 
@@ -55,10 +93,62 @@ class Paren:
 		      	 	repr(self.start_annotation), repr(self.end_annotation),
 		      	 	repr(self.children)))
 
+class BinaryReprParser:
+	"""
+	In comes binary representation (in string form)
+	Out goes parse tree (a Paren)
+	"""
+	@auto_assign
+	def __init__(self, instr):
+		pass
+
+	def parse(self):
+		_, paren = BinaryReprParser.from_binary_repr(self.instr)
+		return paren
+
+	@staticmethod
+	def is_zero(binary_repr):
+		for c in binary_repr:
+			if c == '1':
+				return False
+		return True
+
+	@staticmethod
+	def from_binary_repr(binary_repr):
+		if len(binary_repr) == 1:
+			if binary_repr == '1':
+				return 0, Paren()
+			else:
+				raise Exception
+
+		assert (len(binary_repr) % 2) == 0
+		left_repr = binary_repr[:len(binary_repr) // 2]
+		right_repr = binary_repr[len(binary_repr) // 2:]
+		if BinaryReprParser.is_zero(left_repr):
+			# Left-padded to make up for difference in depth
+			depth, out = BinaryReprParser.from_binary_repr(right_repr)
+		elif BinaryReprParser.is_zero(right_repr):
+			# Right-padded because there is no right branch
+			left_depth, left_paren = BinaryReprParser.from_binary_repr(left_repr)
+			out = Paren()
+			out.children.append(left_paren)
+			depth = left_depth + 1
+			assert len(binary_repr) == (2**depth)
+		else:
+			# Neither left or right padded, both branches exist
+			left_depth, left_paren = BinaryReprParser.from_binary_repr(left_repr)
+			right_depth, right_paren = BinaryReprParser.from_binary_repr(right_repr)
+			out = Paren()
+			out.children.append(left_paren)
+			out.children.append(right_paren)
+			depth = max(left_depth, right_depth) + 1
+			assert len(binary_repr) == (2**depth)
+		return depth, out
+
 class Parser:
 	"""
 	In comes string
-	Out goes parse tree (which looks something like [[], [[], [],[]]])
+	Out goes parse tree (a Paren)
 	"""
 	def __init__(self, instr, filename='<nil>'):
 		self.filename = filename
