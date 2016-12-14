@@ -83,6 +83,30 @@ class Paren:
 			right_repr = '0'*diff + right_repr
 		return left_repr + right_repr
 
+	def __hash__(self):
+		# # This one sucks... so many collisions!
+		# if len(self.children) == 0:
+		#	return 373588441
+		# h = 1
+		# for c in self.children:
+		#	h *= 9223372036854775807
+		#	h += hash(c) * 32416189261 + 179425943
+		#	h %= 18446744073709551557
+		# return h
+
+		# This one does not collide for all 16 bit parens, however it has to
+		# convert to str and hash the string. This is not ideal.
+		if len(self.children) == 0:
+			return 1
+		h = 0
+		for c in self.children:
+			hc = hash(c)
+			# hhc = hash(str(hc)) # Here
+			hhc = hc * 2305843009213693951 + 32416189261
+			h ^= hhc
+			h = (h<<63) | (h>>1) & 0xFFFFFFFFFFFFFFFF
+		return h
+
 	def __str__(self):
 		return '(' + ''.join(map(str, self.children)) + ')'
 
