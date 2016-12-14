@@ -70,6 +70,12 @@ rest     	[\l.l rest-g]
 
 push	[\x.\list.cons x list]
 
+# Option
+
+none  	[\getter.getter true true]
+isnone	[\o.o (\n.\i.n)]
+option	[\i.(\getter.getter false i)]
+
 # Higher order functions
 
 # f takes two arguments, the current item, and its previous state.
@@ -95,11 +101,15 @@ reverse	[\list.reverse-map (\i.i)]
 
 # More list functions
 
-equalimprover	[\lesserequal.\list.\other.if (and (isempty list) (isempty
-other) ) true (if (nor (isempty list) (isempty other)) (and (lesserequal
-(first list) (first other)) (lesserequal (rest list) (rest other)) ) false)]
+equalimprover	[\lesserequal.\list.\other.if (and (isempty list) (isempty other) ) true (if (nor (isempty list) (isempty other)) (and (lesserequal (first list) (first other)) (lesserequal (rest list) (rest other)) ) false)]
+equal        	[\list.\other.y equalimprover list other]
 
+assoc	[\list.\key.foldl (\i.\prev.if (isnone prev) (if (equal (first i) key) (option (rest i)) none) prev)]
 
+# Should be item
+testassoc1	[assoc (cons (cons (cons (cons empty empty) (cons empty empty)) item) (cons (cons (cons (cons empty empty) empty) otheritem) empty)) (cons (cons empty empty) (cons empty empty))]
+# Should be otheritem
+testassoc2	[assoc (cons (cons (cons (cons empty empty) (cons empty empty)) item) (cons (cons (cons (cons empty empty) empty) otheritem) empty)) (cons (cons empty empty) empty)]
 
 
 
