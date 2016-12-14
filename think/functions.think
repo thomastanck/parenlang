@@ -31,7 +31,8 @@ if   	[\c.c]
 and   	[\a.\b.if a b false]
 or    	[\a.\b.if a true b]
 not   	[\a.if a false true]
-nand  	[\a.\b.if a false (not b)]
+nand  	[\a.\b.if a (not b) true]
+nor   	[\a.\b.if a false (not b)]
 xor   	[\a.\b.if a (not b) b]
 xnor  	[\a.\b.if a b (not b)]
 andnot	[\a.\b.and a (not b)]
@@ -92,7 +93,11 @@ reverse-map	[\f.\list.foldl (\i.\prev.push (f i) prev) empty list]
 reverse	[\list.reverse-map (\i.i)]
 
 
+# More list functions
 
+equalimprover	[\lesserequal.\list.\other.if (and (isempty list) (isempty
+other) ) true (if (nor (isempty list) (isempty other)) (and (lesserequal
+(first list) (first other)) (lesserequal (rest list) (rest other)) ) false)]
 
 
 
