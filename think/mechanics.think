@@ -130,12 +130,25 @@ means it evaluates its arguments before evaluating the function.
 The builtins
 ------------
 
+# ehh... kinda bad
 `symbol` converts a paren into a symbol that can be used to create or refer to
 bindings. You'd use this in the first argument to a lambda expression to create
 a binding, and you can use this in the body of the lambda in order to refer to
 that argument. When beta reduction occurs, these symbols will be substituted by
 the argument to the function call.
+# let's try a different approach of explaining this...
 
+Examples
+--------
+
+The following code is equivalent to the lambda expression `\a.\b.b a`
+
+    ((())(()())((())(()(()))((()(()))(()()))))
+
+We can break it apart and label the builtins, (()) --> ((lam)) as this is the
+lambda builtin, and () -> (sym) as this is the symbol builtin.
+
+    ( ((lam)) ((sym)a()) ( ((lam)) ((sym)b(())) ( ((sym)b(())) ((sym)a()) )))
 
 
 
