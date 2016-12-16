@@ -109,6 +109,14 @@ class Paren:
 
 		return hash(tuple(self.children))
 
+	def __eq__(self, other):
+		if len(self.children) != len(other.children):
+			return False
+		for i in range(len(self.children)):
+			if self.children[i] != other.children[i]:
+				return False
+		return True
+
 	def __str__(self):
 		return '(' + ''.join(map(str, self.children)) + ')'
 
@@ -196,7 +204,7 @@ class Parser:
 		self.reset_parse_state()
 		while len(self.remaining) > 0:
 			parsed = self.parse_paren()
-			if parsed != None:
+			if parsed is not None:
 				self.out.append(parsed)
 		return self.out
 
