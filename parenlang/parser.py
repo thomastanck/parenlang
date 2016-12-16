@@ -96,16 +96,18 @@ class Paren:
 
 		# This one does not collide for all 16 bit parens, however it has to
 		# convert to str and hash the string. This is not ideal.
-		if len(self.children) == 0:
-			return 1
-		h = 0
-		for c in self.children:
-			hc = hash(c)
-			# hhc = hash(str(hc)) # Here
-			hhc = hc * 2305843009213693951 + 32416189261
-			h ^= hhc
-			h = (h<<63) | (h>>1) & 0xFFFFFFFFFFFFFFFF
-		return h
+		# if len(self.children) == 0:
+		#	return 1
+		# h = 0
+		# for c in self.children:
+		#	hc = hash(c)
+		#	# hhc = hash(str(hc)) # Here
+		#	hhc = (hc * 790307613855488863 + 4011653645208336749) & 0xFFFFFFFFFFFFFFFF
+		#	h ^= hhc
+		#	h = ((h<<63) | (h>>1)) & 0xFFFFFFFFFFFFFFFFF
+		# return h
+
+		return hash(tuple(self.children))
 
 	def __str__(self):
 		return '(' + ''.join(map(str, self.children)) + ')'

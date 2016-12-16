@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import parenlang
 
+import random
+
 hashset = set()
 
 for i in range(65536):
@@ -21,11 +23,43 @@ for i in range(65536):
         hashset.add(h)
     h = '{:016X}'.format(h)
     print(' | '.join([
-        binary_repr.rjust(16,'0'),
+        # binary_repr.rjust(16,'0'),
         #str(p).ljust(60),
         #b.ljust(60),
         #r.rjust(16),
-        s.ljust(60),
+        s.ljust(100),
+        #'N' if b==s else 'Y',
+        h,
+        ]))
+
+def random_paren(k, r=0):
+    if k == 0:
+        return ''
+    prob_right = r * (k + r + 2) / 2 / k / (r + 1)
+    is_right = random.random() <= prob_right
+    if is_right:
+        return ')' + random_paren(k-1, r-1)
+    else:
+        return '(' + random_paren(k-1, r+1)
+
+trials = 5000000
+for i in range(trials):
+    p_str = '(' + random_paren(98) + ')'
+    p = parenlang.Parser(p_str).parse()[0]
+    s = p.shorthand_form()
+    h = hash(s)
+    s = str(s)
+    if h in hashset:
+        print('collision', s, '{:016X}'.format(h))
+    else:
+        hashset.add(h)
+    h = '{:016X}'.format(h)
+    print(' | '.join([
+        #binary_repr.rjust(16,'0'),
+        #str(p).ljust(60),
+        #b.ljust(60),
+        #r.rjust(16),
+        s.ljust(100),
         #'N' if b==s else 'Y',
         h,
         ]))
