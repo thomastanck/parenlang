@@ -1,131 +1,5 @@
-import re
-
+from .paren import Paren
 from .util import auto_assign # Assigns its arguments to instance attributes
-
-class Paren:
-	"""
-	A paren expression.
-
-	Examples of parens:
-	(): Paren([]) # The empty paren
-	(()): Paren([Paren([])]) # A paren containing one element, the empty paren
-	(()()): Paren([Paren([]), Paren([])]) # A paren containing two elements, each being the empty paren
-
-	(I think you get the (point)): Paren([Paren([])]) # Yeah ok I'll stop now
-
-	In addition to storing the tree structure of parens, there are additional
-	data completely ignored by the VM but we store to allow nice parsing error
-	messages and defining structure using annotations which could allow compile
-	time warnings.
-
-	file is a string containing the filename this paren is in.
-	start is a line,col tuple containing the position of the opening paren.
-	end is a line,col tuple containing the position of the closing paren.
-	start_annotation is the string preceding the opening paren.
-	end_annotation is the string preceding the closing paren.
-
-	'annotate()': Paren([], start_annotation='annotate')
-	'annotate(()strange())': Paren([Paren([]), Paren([], start_annotation='strange')], start_annotation='annotate')
-	'(end annotations)': Paren([], end_annotation='end annotations')
-	"""
-	@auto_assign
-	def __init__(self, filename='', start=None, end=None, start_annotation='', end_annotation='', children=None, parent=None):
-		if children == None:
-			self.children = []
-
-	def add_child(self, paren):
-		self.children.append(paren)
-
-	def start_paren(self, line, col, start_annotation, parent):
-		self.start = (line, col)
-		self.start_annotation = start_annotation
-		self.parent = parent
-
-	def end_paren(self, line, col, end_annotation):
-		self.end = (line, col)
-		self.end_annotation = end_annotation
-
-	def bintree_form(self):
-		out = Paren(self.filename, self.start, self.end, self.start_annotation, self.end_annotation, None, self.parent)
-		out.children = list(map(Paren.bintree_form, self.children))
-		if len(self.children) > 2:
-			group = Paren(out.filename, out.start, out.end, out.start_annotation, out.end_annotation, out.children[:-1], out)
-			group = group.bintree_form()
-			out.children = [group, out.children[-1]]
-		return out
-
-	def shorthand_form(self):
-		out = Paren(self.filename, self.start, self.end, self.start_annotation, self.end_annotation, None, self.parent)
-		out.children = list(map(Paren.shorthand_form, self.children))
-		if len(out.children) > 1 and len(out.children[0].children) > 1:
-			out.children = out.children[0].children + out.children[1:]
-		return out
-
-	def binary_repr(self):
-		if len(self.children) == 0:
-			return '1'
-		elif len(self.children) == 1:
-			child_repr = self.children[0].binary_repr()
-			out = child_repr + '0' * len(child_repr)
-			return out
-		elif len(self.children) == 2:
-			bintree_form = self
-		else:
-			bintree_form = self.bintree_form()
-
-		# len(bintree_form.children) == 2
-		left_repr = bintree_form.children[0].binary_repr()
-		right_repr = bintree_form.children[1].binary_repr()
-		diff = len(left_repr) - len(right_repr)
-		if diff < 0:
-			left_repr = '0'*(-diff) + left_repr
-		elif diff > 0:
-			right_repr = '0'*diff + right_repr
-		return left_repr + right_repr
-
-	def __hash__(self):
-		# # This one sucks... so many collisions!
-		# if len(self.children) == 0:
-		#	return 373588441
-		# h = 1
-		# for c in self.children:
-		#	h *= 9223372036854775807
-		#	h += hash(c) * 32416189261 + 179425943
-		#	h %= 18446744073709551557
-		# return h
-
-		# This one does not collide for all 16 bit parens, however it has to
-		# convert to str and hash the string. This is not ideal.
-		# if len(self.children) == 0:
-		#	return 1
-		# h = 0
-		# for c in self.children:
-		#	hc = hash(c)
-		#	# hhc = hash(str(hc)) # Here
-		#	hhc = (hc * 790307613855488863 + 4011653645208336749) & 0xFFFFFFFFFFFFFFFF
-		#	h ^= hhc
-		#	h = ((h<<63) | (h>>1)) & 0xFFFFFFFFFFFFFFFFF
-		# return h
-
-		return hash(tuple(self.children))
-
-	def __eq__(self, other):
-		if len(self.children) != len(other.children):
-			return False
-		for i in range(len(self.children)):
-			if self.children[i] != other.children[i]:
-				return False
-		return True
-
-	def __str__(self):
-		return '(' + ''.join(map(str, self.children)) + ')'
-
-	def __repr__(self):
-		return	(	'Paren(filename={}, start={}, end={}, '
-		      	 	'start_annotation={}, end_annotation={}, children={})'.format(
-		      	 	repr(self.filename), repr(self.start), repr(self.end),
-		      	 	repr(self.start_annotation), repr(self.end_annotation),
-		      	 	repr(self.children)))
 
 class BinaryReprParser:
 	"""
@@ -164,17 +38,14 @@ class BinaryReprParser:
 		elif BinaryReprParser.is_zero(right_repr):
 			# Right-padded because there is no right branch
 			left_depth, left_paren = BinaryReprParser.from_binary_repr(left_repr)
-			out = Paren()
-			out.children.append(left_paren)
+			out = Paren(children=(left_paren,))
 			depth = left_depth + 1
 			assert len(binary_repr) == (2**depth)
 		else:
 			# Neither left or right padded, both branches exist
 			left_depth, left_paren = BinaryReprParser.from_binary_repr(left_repr)
 			right_depth, right_paren = BinaryReprParser.from_binary_repr(right_repr)
-			out = Paren()
-			out.children.append(left_paren)
-			out.children.append(right_paren)
+			out = Paren(children=(left_paren, right_paren))
 			depth = max(left_depth, right_depth) + 1
 			assert len(binary_repr) == (2**depth)
 		return depth, out
@@ -208,12 +79,13 @@ class Parser:
 				self.out.append(parsed)
 		return self.out
 
-	def parse_paren(self, parentparen=None):
+	def parse_paren(self):
 		"""
 		Recursive part of the parser.
 		Returns the processed paren (list of lists of lists...).
 		"""
-		paren = Paren(self.filename)
+		# paren = Paren(self.filename)
+		children = []
 
 		start_annotation, tok = self.eat()
 		if tok == None:
@@ -222,22 +94,27 @@ class Parser:
 		if tok != '(': # assert(tok == '(')
 			self.unexpected_closing_error()
 
-		paren.start_paren(self.line, self.col-1, start_annotation, parentparen)
+		start = (self.line, self.col-1)
+		# paren.start_paren(self.line, self.col-1, start_annotation, parentparen)
 
 		while len(self.remaining) > 0:
 			annotation, tok = self.peek()
 			if tok == '(':
-				parsed = self.parse_paren(paren)
-				paren.add_child(parsed)
+				parsed = self.parse_paren()
+				children.append(parsed)
+				# paren.add_child(parsed)
 			elif tok == ')':
 				self.eat() # Advance the position
-				paren.end_paren(self.line, self.col-1, annotation)
+				# paren.end_paren(self.line, self.col-1, annotation)
+				end = (self.line, self.col-1)
+				paren = Paren(self.filename, start, end, start_annotation, annotation, tuple(children))
 				# TOOD: Run linter here! (to check if start and end annotations
 				# match for example)
 				return paren
 			else:
 				break
 		self.eat() # just to advance it to the actual EOF
+		paren = Paren(self.filename, start, None, start_annotation, '', tuple(children))
 		self.unexpected_eof_error(paren)
 
 	def eat(self):
@@ -299,19 +176,19 @@ class Parser:
 		print('{}  hint: Did you forget to close a paren?'.format(' '*len(prefix)))
 		self.print_line_error((self.line, self.col), note=' EOF')
 
-		num_unclosed = 0
-		unclosed = paren
-		while unclosed:
-			unclosed = unclosed.parent
-			num_unclosed += 1
+		# num_unclosed = 0
+		# unclosed = paren
+		# while unclosed:
+		#	unclosed = unclosed.parent
+		#	num_unclosed += 1
 
-		print('{}  note: There are {} unclosed parens'.format(' '*len(prefix), num_unclosed))
-		unclosed = paren
-		while unclosed:
-			prefix = '{}:{}:{}:'.format(unclosed.filename, unclosed.start[0], unclosed.start[1])
-			print('{}  note: unclosed paren'.format(prefix))
-			self.print_line_error(unclosed.start, (self.line, self.col))
-			unclosed = unclosed.parent
+		# print('{}  note: There are {} unclosed parens'.format(' '*len(prefix), num_unclosed))
+		# unclosed = paren
+		# while unclosed:
+		#	prefix = '{}:{}:{}:'.format(unclosed.filename, unclosed.start[0], unclosed.start[1])
+		#	print('{}  note: unclosed paren'.format(prefix))
+		#	self.print_line_error(unclosed.start, (self.line, self.col))
+		#	unclosed = unclosed.parent
 
 		print()
 		raise SyntaxError('{} Unexpected EOF'.format(prefix))
