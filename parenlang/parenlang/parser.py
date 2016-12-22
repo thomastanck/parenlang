@@ -397,7 +397,7 @@ Parser = FlatParser
 class GeneratorBasedParser:
 	"""
 	Call parse with string
-	Call end for EOF, or call parse with FlatParser.EOF
+	Call end for EOF, or call parse with GeneratorBasedParser.EOF
 	Call collect to end parsing and retrieve parse tree (a list of Paren)
 	"""
 	class EOF: pass
@@ -420,18 +420,22 @@ class GeneratorBasedParser:
 		self.parser.send(None)
 
 	def parse(self, instr):
-		if instr is not FlatParser.EOF:
+		self.parse_bit(instr)
+		return self.collect()
+
+	def parse_bit(self, instr):
+		if instr is not GeneratorBasedParser.EOF:
 			self.instr += instr
 		self.tokenizer.send(instr)
 		return self
 
 	def end(self):
 		if self.parsing:
-			self.parse(FlatParser.EOF)
+			self.parse(GeneratorBasedParser.EOF)
 		return self
 	def collect(self):
 		if self.parsing:
-			self.parse(FlatParser.EOF)
+			self.parse(GeneratorBasedParser.EOF)
 
 		return self.paren_list_stack[0]
 
@@ -442,7 +446,7 @@ class GeneratorBasedParser:
 
 		while True:
 			a = yield
-			if a == FlatParser.EOF:
+			if a == GeneratorBasedParser.EOF:
 				self.parser.send((a, annotation, (line, col)))
 				self.parsing = False
 				break
@@ -465,7 +469,7 @@ class GeneratorBasedParser:
 		while True:
 			token = yield
 			tok, annotation, pos = token
-			if tok == FlatParser.EOF:
+			if tok == GeneratorBasedParser.EOF:
 				if len(self.opening_stack) > 0:
 					self.unexpected_eof_error(pos)
 				break
