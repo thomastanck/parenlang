@@ -1,6 +1,24 @@
 from .paren import Paren
 from .util import auto_assign # Assigns its arguments to instance attributes
 
+class SuccinctReprParser:
+	def __init__(self):
+		pass
+
+	def parse(self, instr):
+		c, instr = instr[0], instr[1:]
+		if c == '0':
+			return None, instr
+		# c == '1'
+		left, instr = self.parse(instr)
+		right, instr = self.parse(instr)
+		if left == None:
+			return Paren(), instr
+		elif right == None:
+			return Paren(children=(left,)), instr
+		else:
+			return Paren(children=(left, right)), instr
+
 class BinaryReprParser:
 	"""
 	In comes binary representation (in string form)

@@ -57,6 +57,22 @@ class Paren:
 			right_repr = '0'*diff + right_repr
 		return left_repr + right_repr
 
+	def succinct_repr(self):
+		if len(self.children) == 0:
+			return '100'
+		elif len(self.children) == 1:
+			left_repr = self.children[0].succinct_repr()
+			return '1' + left_repr + '0'
+		elif len(self.children) == 2:
+			bintree_form = self
+		else:
+			bintree_form = self.bintree_form()
+		left_repr = bintree_form.children[0].succinct_repr()
+		right_repr = bintree_form.children[1].succinct_repr()
+		out = '1' + left_repr + right_repr
+		return out
+
+
 	def __hash__(self):
 		return hash(self.children)
 
