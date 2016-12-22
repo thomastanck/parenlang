@@ -19,3 +19,22 @@ def auto_assign(f):
 				setattr(instance, param.name, param.default)
 		return f(*args, **kwargs)
 	return _wrap
+
+def random_paren(k, r=0):
+	out = ''
+	while k > 0:
+		# if k == 0:
+		#     return ''
+		prob_right = r * (k + r + 2) / 2 / k / (r + 1)
+		is_right = random.random() <= prob_right
+		if is_right:
+			out += ')'
+			k -= 1
+			r -= 1
+			# return ')' + random_paren(k-1, r-1)
+		else:
+			out += '('
+			k -= 1
+			r += 1
+			# return '(' + random_paren(k-1, r+1)
+	return out
