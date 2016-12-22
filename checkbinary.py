@@ -63,4 +63,5 @@ trials = 500
 for i in range(trials):
     p_str = '(' + random_paren(98) + ')'
     p = parenlang.Parser(p_str).parse()[0]
+    # p = parenlang.FlatParser().parse(p_str).collect()[0]
     test_paren_hash(p)

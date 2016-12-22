@@ -50,6 +50,7 @@ class BinaryReprParser:
 			assert len(binary_repr) == (2**depth)
 		return depth, out
 
+
 class Parser:
 	"""
 	In comes string
@@ -189,6 +190,174 @@ class Parser:
 		#	print('{}  note: unclosed paren'.format(prefix))
 		#	self.print_line_error(unclosed.start, (self.line, self.col))
 		#	unclosed = unclosed.parent
+
+		print()
+		raise SyntaxError('{} Unexpected EOF'.format(prefix))
+
+	def print_line_error(self, start, end=None, note=''):
+		startline, startcol = start
+		# Print the actual line
+		print(self.get_line(startline))
+		# Print the arrow
+		if end == None:
+			# Arrow has no extension
+			print(' '*(startcol-1) + '^' + note)
+			return
+		endline, endcol = end
+		if endline > startline:
+			# Arrow extends to end of line
+			print(' '*(startcol-1) + '^' + '~'*(len(self.lines[startline-1])-startcol) + note)
+		elif endline < startline:
+			# Arrow extends to start of line
+			print('~'*(startcol-1) + '^' + note)
+		else:
+			# Arrow extends to another point on the same line
+			if endcol > startcol:
+				# Arrow extends to the right
+				print(' '*(startcol-1) + '^' + '~'*(endcol-startcol-1) + note)
+			elif endcol < startcol:
+				# Arrow extends to the left
+				print(' '*(endcol) + '~'*(startcol-endcol-1) + '^' + note)
+			else:
+				# Arrow has no extension
+				print(' '*(startcol-1) + '^' + note)
+
+	def get_line(self, line):
+		if line-1 < len(self.lines):
+			return self.lines[line-1]
+		elif line-1 == len(self.lines):
+			return self.get_current_line()
+		else:
+			raise RuntimeError("Tried to get line that hasn't been parsed")
+
+
+###################################################
+# vvvv DON'T USE! THIS WAS JUST MADE FOR FUN vvvv #
+###################################################
+
+class FlatParser:
+	"""
+	Call parse with string
+	Call end for EOF, or call parse with FlatParser.EOF
+	Call collect to end parsing and retrieve parse tree (a list of Paren)
+	"""
+	class EOF: pass
+
+	def __init__(self, filename='<nil>'):
+		self.filename = filename
+		self.instr = ''
+
+		self.curlinepos = 0
+		self.lines = []
+
+		self.opening_stack = []
+		self.paren_list_stack = [[]]
+
+		self.parsing = True
+
+		self.tokenizer = self.tokenizer_func()
+		self.tokenizer.send(None)
+		self.parser = self.parser_func()
+		self.parser.send(None)
+
+	def parse(self, instr):
+		if instr is not FlatParser.EOF:
+			self.instr += instr
+		self.tokenizer.send(instr)
+		return self
+
+	def end(self):
+		if self.parsing:
+			self.parse(FlatParser.EOF)
+		return self
+	def collect(self):
+		if self.parsing:
+			self.parse(FlatParser.EOF)
+
+		return self.paren_list_stack[0]
+
+	def tokenizer_func(self):
+		line = 1
+		col = 1
+		annotation = ''
+
+		while True:
+			a = yield
+			if a == FlatParser.EOF:
+				self.parser.send((a, annotation, (line, col)))
+				self.parsing = False
+				break
+			for c in a:
+				if c == '(' or c == ')':
+					self.parser.send((c, annotation, (line, col)))
+					annotation = ''
+				else:
+					annotation += c
+				if c == '\n':
+					self.lines.append(self.instr[self.curlinepos : self.curlinepos+col-1])
+					self.curlinepos += col
+					line += 1
+					col = 1
+				else:
+					col += 1
+		yield None
+
+	def parser_func(self):
+		while True:
+			token = yield
+			tok, annotation, pos = token
+			if tok == FlatParser.EOF:
+				if len(self.opening_stack) > 0:
+					self.unexpected_eof_error(pos)
+				break
+			elif tok == '(':
+				self.opening_stack.append(token)
+				self.paren_list_stack.append([])
+			elif tok == ')':
+				if len(self.opening_stack) == 0:
+					self.unexpected_closing_error(pos)
+				opening_token = self.opening_stack.pop()
+				_, start_annotation, start_pos = opening_token
+				paren_list = self.paren_list_stack.pop()
+				p = Paren(self.filename, start_pos, pos, start_annotation, annotation, tuple(paren_list))
+				self.paren_list_stack[-1].append(p)
+			else:
+				raise RuntimeError('Illegal token (please inform the maintainer that this occurred!)')
+		yield None
+
+	def get_current_line(self):
+		newlinepos = self.instr[self.curlinepos:].find('\n')
+		if newlinepos == -1:
+			return self.instr[self.curlinepos:]
+		else:
+			return self.instr[self.curlinepos:self.curlinepos+newlinepos]
+
+	def unexpected_closing_error(self, pos):
+		line, col = pos
+		prefix = '{}:{}:{}:'.format(self.filename, line, col-1)
+		print('{} error: Expected ( but got ) instead.'.format(prefix))
+		print('{}  hint: Did you forget to remove a closing paren?'.format(' '*len(prefix)))
+		self.print_line_error((line, col-1))
+
+		if len(self.out) > 0:
+			print('{}  note: Previous paren starts here'.format(' '*len(prefix)))
+			prevparen = self.out[-1]
+			self.print_line_error(prevparen.start, (prevparen.end[0], prevparen.end[1]+1))
+
+		print()
+		raise SyntaxError('{} Unexpected closing paren'.format(prefix))
+
+	def unexpected_eof_error(self, pos):
+		line, col = pos
+		prefix = '{}:{}:{}:'.format(self.filename, line, col)
+		print('{} error: Unexpected EOF'.format(prefix))
+		print('{}  hint: Did you forget to close a paren?'.format(' '*len(prefix)))
+		self.print_line_error((line, col), note=' EOF')
+
+		print('{}  note: There are {} unclosed parens'.format(' '*len(prefix), len(self.opening_stack)))
+		for (tok, annotation, unclosed_pos) in self.opening_stack:
+			print('{}  note: unclosed paren'.format(prefix))
+			self.print_line_error(unclosed_pos, pos)
 
 		print()
 		raise SyntaxError('{} Unexpected EOF'.format(prefix))
